@@ -7,6 +7,7 @@
 #include <uuid/uuid.h>
 #include "request.h"
 #include "io_helper.h"
+#include <sqlite3.h>
 
 typedef struct estMensaje
 {
@@ -29,6 +30,19 @@ char default_root[] = ".";
 // 
 int main(int argc, char *argv[]) {
 	int c;
+	//base de datos puntero
+	char *err;
+	sqlite3 *db;
+	sqlite3_stmt * stmt;
+	sqlite3_open("myDB.db", &db);
+	int check = sqlite3_exec(db, "CREATE TABLE IF NOT EXISTS p1(uuid VARCHAR(100), initial VARCHAR(100), final VARCHAR(100))", NULL, NULL, &err);
+	if (check != SQLITE_OK) {
+		printf("error al crear bd.\n");
+	}
+	else{
+		printf("base de datos creada o abierta correctamente.\n");
+	}
+
     char *root_dir = default_root;
     int port = 10000;
     
@@ -66,6 +80,7 @@ int main(int argc, char *argv[]) {
     	//listener parent
     	//reader
     	printf("listening\n");
+    	int check;
     	while(1){
 
     		int aux = msgrcv(msg_id, (void *)&mensaje2, sizeof(estMensaje2), msgtype, 0);
@@ -80,13 +95,35 @@ int main(int argc, char *argv[]) {
 
     		uuid_t out;
     		uuid_generate_random(&out);
+			char uuidstr[100];
+			uuid_unparse(out,uuidstr);
+			//printf("uuid a string: %s",&uuidstr);
 
-    		printf("recibi: %s %s %s\n",ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2),out);
+
+
+    		char sql[150];
+			//printf("%s", out);
+			//snprintf(sql,150,"INSERT INTO p1(uuid, initial,final) VALUES('%s','%s','%s')", &out, ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2));
+			//snprintf(sql,150,"INSERT INTO p1(uuid, initial,final) VALUES('prueba','%s','%s')", ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2));
+			snprintf(sql,150,"INSERT INTO p1(uuid, initial,final) VALUES('%s','%s','%s')",&uuidstr, ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2));
+    		//printf("\nrecibi: %s %s %s\n\n",ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2),out);
+			
+			check = sqlite3_exec(db, sql, NULL, NULL, &err);
+			if (check != SQLITE_OK) {
+				printf("error al insertar %s a la bd.\n", sql);
+			}
+			memset(sql,0,500);
+
+    		/*if (sqlite3_exec(db, sql, NULL,NULL,NULL) != SQLITE_OK)
+    		{
+    			printf("no se pudo insertar a la bd\n");
+    		}*/
     	}
 
     	if(msgctl(msg_id,IPC_RMID,0)==1){
     		printf("MSGCTL(IPC_RMID) failed\n");
     	}
+    	//sqlite3_close(db);
     }
     else if(init_fork > 0){
     	//hijo hace requests
@@ -127,7 +164,7 @@ int main(int argc, char *argv[]) {
 					break;
 				}
 				
-				printf("le mande: %s %s \n",ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2));
+				//printf("le mande: %s %s \n",ctime(&mensaje2.tiempo1), ctime(&mensaje2.tiempo2));
 
 				exit(0);
 			}
